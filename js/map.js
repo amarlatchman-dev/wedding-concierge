@@ -18,7 +18,7 @@ export class MapView {
     this.g = el('g', {}, this.svg);
     this.img = el('image', { href: src, x: 0, y: 0, width, height, preserveAspectRatio: 'none' }, this.g);
     this.layers = {};
-    for (const n of ['under', 'route', 'markers', 'top']) this.layers[n] = el('g', { class: 'layer-' + n }, this.g);
+    for (const n of ['base', 'under', 'route', 'markers', 'top']) this.layers[n] = el('g', { class: 'layer-' + n }, this.g);
     this.s = 1; this.tx = 0; this.ty = 0;
     this._pointers = new Map();
     this._bind();
@@ -174,7 +174,93 @@ export class MapView {
     this._apply();
   }
   clear(name) { this.layers[name].innerHTML = ''; }
+
+  // Illustrated base map in the invitation style. Falls back to the uploaded image when no shapes exist.
+  drawBase(map, graph, markers, { interactive = true, original = false } = {}) {
+    const L = this.layers.base; L.innerHTML = '';
+    const illustrated = map.style === 'illustrated' && map.areas?.length && !original;
+    this.img.style.display = illustrated ? 'none' : '';
+    this.host.classList.toggle('illustrated', !!illustrated);
+    if (!illustrated) return;
+    const link = (g, a) => { if (interactive && a.marker) { g.setAttribute('data-marker', a.marker); g.setAttribute('data-area', a.marker); } };
+    // Speckled lawn texture like the invitation's watercolour greens.
+    const defs = el('defs', {}, L);
+    const pat = el('pattern', { id: 'speck', width: 18, height: 18, patternUnits: 'userSpaceOnUse' }, defs);
+    [[3, 4, 1.1], [11, 2, .8], [7, 11, 1.2], [15, 14, .9], [2, 15, .7]].forEach(([x, y, r]) => el('circle', { cx: x, cy: y, r, class: 'speck' }, pat));
+    const hatch = el('pattern', { id: 'hatch', width: 10, height: 10, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+    el('line', { x1: 0, y1: 0, x2: 0, y2: 10, class: 'hatch' }, hatch);
+    const shape = (a, parent) => a.circle ? el('circle', { cx: a.circle[0], cy: a.circle[1], r: a.circle[2] }, parent) : el('polygon', { points: a.pts }, parent);
+    const order = ['grounds', 'lawn-soft', 'paving', 'track', 'lawn', 'parking', 'plaza', 'building', 'venue-building', 'water'];
+    const areas = [...map.areas].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+    // Paths go above lawns but below buildings and cottage gardens, so they read as walkways between them.
+    let pathsDrawn = false;
+    const drawPaths = () => {
+      if (pathsDrawn || !graph) return; pathsDrawn = true;
+      const pos = Object.fromEntries(graph.nodes.map((n) => [n.id, n]));
+      const g = el('g', { class: 'paths' }, L);
+      for (const cls of ['path-edge', 'path-fill']) for (const e of graph.edges) {
+        const a = pos[e.a], b = pos[e.b]; if (!a || !b || e.restricted) continue;
+        const w = e.type === 'walk' ? 9 : 15;
+        el('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: cls, 'stroke-width': cls === 'path-edge' ? w + 3 : w }, g);
+      }
+    };
+    for (const a of areas) {
+      if (order.indexOf(a.kind) >= order.indexOf('lawn') && a.id !== 'scenic' && a.id !== 'poolgarden' && a.id !== 'jalsa' && a.id !== 'courtyard') drawPaths();
+      const g = el('g', { class: `area area-${a.kind}` }, L);
+      link(g, a);
+      if (a.kind === 'grounds') { const sh = shape(a, g); sh.setAttribute('class', 'grounds-shadow'); }
+      shape(a, g);
+      if (a.kind === 'lawn' || a.kind === 'lawn-soft') shape(a, g).setAttribute('class', 'speckle');
+      if (a.kind === 'parking') shape(a, g).setAttribute('class', 'hatching');
+      if (a.label) {
+        const [x, y] = a.circle ? a.circle : centroid(a.pts);
+        const t = el('text', { x, y: y + 4, 'text-anchor': 'middle', class: 'area-label' }, g); t.textContent = a.label;
+      }
+    }
+    drawPaths();
+    // Amphitheatre rows
+    const am = map.amphitheatre;
+    if (am) {
+      const g = el('g', { class: 'area area-amphi' }, L); link(g, am);
+      const r0 = am.radii.at(-1) + 8;
+      el('path', { d: sector(am.cx, am.cy, r0, am.from, am.to), class: 'amphi-bg' }, g);
+      for (const r of am.radii) el('path', { d: arc(am.cx, am.cy, r, am.from, am.to), class: 'amphi-row' }, g);
+    }
+    // Cottage blocks: a diamond garden with four cottages at its points.
+    for (const m of markers.filter((x) => x.category === 'cottage' && /^\d+$/.test(x.code || ''))) {
+      const g = el('g', { class: 'cot' }, L); if (interactive) g.setAttribute('data-marker', m.id), g.setAttribute('data-area', m.id);
+      el('polygon', { points: `${m.x},${m.y - 30} ${m.x + 39},${m.y} ${m.x},${m.y + 30} ${m.x - 39},${m.y}`, class: 'cot-lawn' }, g);
+      for (const [dx, dy] of [[0, -30], [39, 0], [0, 30], [-39, 0]]) el('rect', { x: m.x + dx - 7, y: m.y + dy - 7, width: 14, height: 14, rx: 2.5, transform: `rotate(45 ${m.x + dx} ${m.y + dy})`, class: 'cot-unit' }, g);
+      const t = el('text', { x: m.x, y: m.y + 5, 'text-anchor': 'middle', class: 'cot-num' }, g); t.textContent = m.code;
+    }
+    // Boundary in gold, drawn twice like a foil border.
+    const gr = map.areas.find((a) => a.kind === 'grounds');
+    if (gr) { el('polygon', { points: gr.pts, class: 'boundary-outer' }, L); el('polygon', { points: gr.pts, class: 'boundary-inner' }, L); }
+    // Cartouche, compass and road signs fill the empty corners.
+    const c = el('g', { class: 'cartouche' }, L);
+    const tt = el('text', { x: 300, y: 150, 'text-anchor': 'middle', class: 'carto-title' }, c); tt.textContent = map.title || 'Neejanand';
+    const st = el('text', { x: 300, y: 196, 'text-anchor': 'middle', class: 'carto-sub' }, c); st.textContent = map.subtitle || 'LUXURIOUS RESORT · ANAND';
+    el('path', { d: 'M180 222 H280 M320 222 H420', class: 'carto-rule' }, c);
+    el('path', { d: 'M300 210 l8 12 l-8 12 l-8 -12 z', class: 'carto-orn' }, c);
+    const cp = el('g', { class: 'compass', transform: 'translate(300 330)' }, L);
+    el('circle', { r: 46, class: 'compass-ring' }, cp); el('circle', { r: 38, class: 'compass-ring thin' }, cp);
+    el('path', { d: 'M0 -40 L9 0 L0 40 L-9 0 Z', class: 'compass-needle' }, cp);
+    el('path', { d: 'M-40 0 L0 7 L40 0 L0 -7 Z', class: 'compass-needle light' }, cp);
+    const n = el('text', { y: -54, 'text-anchor': 'middle', class: 'compass-n' }, cp); n.textContent = 'N';
+    const road = el('text', { x: 1440, y: 1060, 'text-anchor': 'middle', class: 'road-label' }, L); road.textContent = 'Anand-Borsad Road  ⟶';
+    const road2 = el('text', { x: 1310, y: 1052, 'text-anchor': 'end', class: 'road-label' }, L); road2.textContent = 'Main Gate ↑';
+    this._apply();
+  }
+  highlightAreas(ids = []) {
+    const on = new Set(ids.filter(Boolean));
+    this.layers.base.querySelectorAll('[data-area]').forEach((g) => g.classList.toggle('area-on', on.has(g.dataset.area)));
+  }
 }
+
+function centroid(pts) { const p = pts.split(' ').map((q) => q.split(',').map(Number)); return [p.reduce((s, q) => s + q[0], 0) / p.length, p.reduce((s, q) => s + q[1], 0) / p.length]; }
+const pol = (cx, cy, r, deg) => [cx + r * Math.cos((deg * Math.PI) / 180), cy + r * Math.sin((deg * Math.PI) / 180)];
+function arc(cx, cy, r, a0, a1) { const [x0, y0] = pol(cx, cy, r, a0), [x1, y1] = pol(cx, cy, r, a1); return `M${x0},${y0} A${r},${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1},${y1}`; }
+function sector(cx, cy, r, a0, a1) { return `M${cx},${cy} L${pol(cx, cy, r, a0).join(',')} ${arc(cx, cy, r, a0, a1).replace(/^M[^A]+/, '')} Z`; }
 
 export const markerCard = (m) => {
   const cat = CATEGORIES[m.category] || CATEGORIES.other;

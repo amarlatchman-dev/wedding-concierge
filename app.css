@@ -133,7 +133,7 @@ button { font: inherit; color: inherit; }
 .mapview g { transform-origin: 0 0; }
 .map-top { position: absolute; top: 0; left: 0; right: 0; padding: 12px 12px 6px; display: flex; gap: 8px; overflow-x: auto; z-index: 5; scrollbar-width: none; }
 .map-top::-webkit-scrollbar { display: none; }
-.map-ctrl { position: absolute; right: 12px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 5; }
+.map-ctrl { position: absolute; right: 12px; top: 62px; display: flex; flex-direction: column; gap: 8px; z-index: 5; }
 .map-ctrl button { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--gold); box-shadow: var(--shadow); font-size: 20px; cursor: pointer; }
 .sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--surface); border-radius: 26px 26px 0 0; box-shadow: 0 -10px 34px rgba(60,30,30,.16); padding: 10px 20px 20px; z-index: 10; max-height: 62%; overflow-y: auto; animation: up .35s cubic-bezier(.2,.8,.2,1) both; border-top: 1px solid var(--line); }
 .sheet::before { content: ''; display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--gold-2); opacity: .6; margin: 0 auto 12px; }
@@ -146,7 +146,7 @@ button { font: inherit; color: inherit; }
 .mk-label { font: 600 12px var(--sans); fill: #3b2a2f; paint-order: stroke; stroke: #fffdf9; stroke-width: 4px; stroke-linejoin: round; pointer-events: none; letter-spacing: .02em; }
 .mk-label-on { font: 600 15px var(--serif); }
 .mk-dim { opacity: .35; }
-.mk-pulse { opacity: .25; animation: pulse 2s ease-out infinite; transform-origin: center; }
+.mk-pulse { opacity: .25; animation: pulse 2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes pulse { 0% { transform: scale(.6); opacity: .5; } 100% { transform: scale(1.5); opacity: 0; } }
 .route-casing { stroke: #fffaf0; stroke-linecap: round; stroke-linejoin: round; }
 .route-line { stroke: #c2185b; stroke-linecap: round; stroke-linejoin: round; }
@@ -180,3 +180,50 @@ select:focus, input:focus, textarea:focus { outline: 2px solid color-mix(in srgb
 .splash { min-height: 80vh; display: grid; place-items: center; text-align: center; }
 .splash img { width: 170px; mix-blend-mode: var(--art-blend); animation: breathe 1.6s ease-in-out infinite; }
 @keyframes breathe { 50% { opacity: .55; transform: scale(.97); } }
+
+/* ---------- Illustrated map ---------- */
+:root { --m-paper: #f7efe2; --m-grounds: #eef0e0; --m-lawn: #cddcbf; --m-lawn-soft: #dfe7d0; --m-speck: #8fae86; --m-paving: #fbf5ea; --m-path: #fffaf1; --m-path-edge: #e2c991;
+  --m-building: #f6e3d8; --m-building-line: #cf9f8c; --m-venue: #f7d6e0; --m-venue-line: #c4587f; --m-water: #cfe6ee; --m-water-line: #8dbccc; --m-track: #f2e2c4; --m-gold: #b38a45; --m-ink: #5b4136; --m-cot: #d6e2c8; --m-unit: #fffaf2; --m-unit-line: #c9a46a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --m-paper: #121830; --m-grounds: #1b2a2a; --m-lawn: #27443a; --m-lawn-soft: #213530; --m-speck: #3f6a58; --m-paving: #2a3150; --m-path: #3a4268; --m-path-edge: #8e7748;
+  --m-building: #3a2f45; --m-building-line: #8c6a7d; --m-venue: #4f2a44; --m-venue-line: #e993b0; --m-water: #1f4660; --m-water-line: #4f8fae; --m-track: #3b3550; --m-gold: #e0c07e; --m-ink: #f1e4cf; --m-cot: #2b4a3e; --m-unit: #3a4268; --m-unit-line: #a88b54; } }
+.mapview.illustrated { background: radial-gradient(80% 60% at 20% 10%, color-mix(in srgb, var(--wash-1) 60%, transparent), transparent), radial-gradient(70% 50% at 90% 90%, color-mix(in srgb, var(--wash-2) 70%, transparent), transparent), var(--m-paper); }
+.area polygon, .area circle, .area path { stroke-linejoin: round; transition: fill .25s, stroke .25s; }
+.area-grounds polygon { fill: var(--m-grounds); }
+.area-grounds .grounds-shadow { fill: rgba(120, 80, 40, .08); transform: translate(6px, 8px); }
+.area-paving polygon { fill: var(--m-paving); }
+.area-lawn polygon, .area-lawn circle { fill: var(--m-lawn); stroke: color-mix(in srgb, var(--m-speck) 70%, transparent); stroke-width: 1.5; }
+.area-lawn-soft polygon { fill: var(--m-lawn-soft); }
+.speckle { fill: url(#speck) !important; stroke: none !important; pointer-events: none; }
+.speck { fill: var(--m-speck); opacity: .55; }
+.area-track polygon { fill: var(--m-track); stroke: var(--m-path-edge); stroke-width: 2; stroke-dasharray: 1 6; stroke-linecap: round; }
+.area-building polygon, .area-building circle { fill: var(--m-building); stroke: var(--m-building-line); stroke-width: 2; }
+.area-venue-building polygon, .area-venue-building circle { fill: var(--m-venue); stroke: var(--m-venue-line); stroke-width: 2; }
+.area-water polygon { fill: var(--m-water); stroke: var(--m-water-line); stroke-width: 2; }
+.area-parking polygon { fill: var(--m-paving); stroke: var(--m-building-line); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.hatching { fill: url(#hatch) !important; stroke: none !important; }
+.hatch { stroke: var(--m-building-line); stroke-width: 1.2; opacity: .5; }
+.area-plaza polygon { fill: var(--m-paving); stroke: var(--m-path-edge); stroke-width: 1.5; }
+.area-label { font: italic 600 14px var(--serif); fill: var(--m-ink); opacity: .8; pointer-events: none; paint-order: stroke; stroke: var(--m-paper); stroke-width: 3px; }
+.path-edge { stroke: var(--m-path-edge); stroke-linecap: round; }
+.path-fill { stroke: var(--m-path); stroke-linecap: round; }
+.amphi-bg { fill: var(--m-paving); stroke: var(--m-building-line); stroke-width: 1.5; }
+.amphi-row { fill: none; stroke: var(--m-building-line); stroke-width: 4; stroke-linecap: round; }
+.cot-lawn { fill: var(--m-cot); stroke: color-mix(in srgb, var(--m-speck) 60%, transparent); stroke-width: 1.2; }
+.cot-unit { fill: var(--m-unit); stroke: var(--m-unit-line); stroke-width: 1.4; }
+.cot-num { font: 600 15px var(--serif); fill: var(--m-ink); opacity: .75; pointer-events: none; }
+.boundary-outer { fill: none; stroke: var(--m-gold); stroke-width: 5; opacity: .7; }
+.boundary-inner { fill: none; stroke: var(--m-gold); stroke-width: 1.2; transform: translate(0, 0); stroke-dasharray: 2 5; opacity: .9; }
+.carto-title { font: 400 76px var(--script); fill: var(--rose); }
+.carto-sub { font: 500 15px var(--sans); letter-spacing: .32em; fill: var(--m-ink); opacity: .75; }
+.carto-rule { stroke: var(--m-gold); stroke-width: 1.2; }
+.carto-orn { fill: none; stroke: var(--m-gold); stroke-width: 1.5; }
+.compass-ring { fill: none; stroke: var(--m-gold); stroke-width: 1.5; } .compass-ring.thin { stroke-width: .8; stroke-dasharray: 2 4; }
+.compass-needle { fill: var(--m-gold); } .compass-needle.light { fill: color-mix(in srgb, var(--m-gold) 40%, transparent); }
+.compass-n { font: 600 20px var(--serif); fill: var(--m-gold); }
+.road-label { font: italic 600 18px var(--serif); fill: var(--m-ink); opacity: .7; }
+[data-area] { cursor: pointer; }
+[data-area]:hover polygon:not(.speckle):not(.hatching), [data-area]:hover circle { filter: brightness(1.04); }
+.area-on polygon:not(.speckle):not(.hatching), .area-on circle, .area-on .amphi-bg, .cot.area-on .cot-lawn { stroke: var(--rose) !important; stroke-width: 4 !important; stroke-dasharray: none !important; }
+.area-on.area-lawn polygon:not(.speckle) { fill: color-mix(in srgb, var(--m-lawn) 75%, var(--rose)); }
+.area-on.area-venue-building polygon, .area-on.area-building polygon:not(.hatching) { fill: color-mix(in srgb, var(--m-venue) 60%, var(--rose)); }
+.cot.area-on .cot-lawn { fill: color-mix(in srgb, var(--m-cot) 70%, var(--gold)); }

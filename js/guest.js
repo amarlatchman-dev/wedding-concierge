@@ -151,9 +151,13 @@ function schedule() {
 function mountMap() {
   view.innerHTML = `<div class="mapscreen"><div id="mapHost" style="position:absolute;inset:0"></div>
     <div class="map-top" id="mapTop"></div>
-    <div class="map-ctrl"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zfit" aria-label="Show whole map">⤢</button></div>
+    <div class="map-ctrl"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zfit" aria-label="Show whole map">⤢</button>${data.map.style === 'illustrated' ? '<button id="zorig" aria-label="Switch between illustrated and original map" title="Original resort map" style="font-size:15px">◐</button>' : ''}</div>
     <div id="sheet"></div></div>`;
   mapView = new MapView($('#mapHost'), { src: data.map.src, width: data.map.width, height: data.map.height });
+  let original = false;
+  const base = () => mapView.drawBase(data.map, data.graph, data.markers, { original });
+  base();
+  $('#zorig') && ($('#zorig').onclick = () => { original = !original; base(); mapView.highlightAreas(mapView._hl || []); });
   $('#zin').onclick = () => mapView.zoomBy(1.4); $('#zout').onclick = () => mapView.zoomBy(1 / 1.4); $('#zfit').onclick = () => mapView.fit();
   return mapView;
 }
@@ -166,6 +170,7 @@ function mapScreen(focusId) {
   const draw = (sel) => {
     const list = data.markers.filter((m) => filter === 'all' ? (m.category !== 'cottage' || m.id === home?.id || m.id === sel) : m.category === filter || m.id === home?.id);
     mv.drawMarkers(list.map((m) => (m.id === home?.id ? { ...m, label: 'Your cottage' } : m)), { highlight: [home?.id, sel], labels: filter === 'all' ? 'venue' : 'all' });
+    mv._hl = [home?.id, sel]; mv.highlightAreas(mv._hl);
   };
   $('#mapTop').innerHTML = cats.map((c) => `<span class="chip ${c === 'all' ? 'on' : ''}" data-c="${c}">${c === 'all' ? 'Highlights' : `<span class="dot" style="background:${CATEGORIES[c].color}"></span>${esc(CATEGORIES[c].label)}`}</span>`).join('');
   $('#mapTop').onclick = (e) => { const c = e.target.closest('.chip'); if (!c) return; filter = c.dataset.c; $('#mapTop').querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === c)); draw(); };
@@ -200,6 +205,7 @@ function nav(destId) {
     const r = findRoute(data, from, dest, mode);
     mv.drawMarkers([dest, ...(from.id ? [from] : []), ...data.markers.filter((m) => m.category === 'venue' && m.id !== dest.id)], { highlight: [dest.id, from.id], dim: true });
     mv.drawRoute(r?.points);
+    mv._hl = [dest.id, from.id]; mv.highlightAreas(mv._hl);
     renderSheet(r);
     focusRoute(r);
   };

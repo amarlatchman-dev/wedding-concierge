@@ -266,9 +266,11 @@ function editEvent(ev, after) {
 }
 
 // ---------- Map & places ----------
-function mapEditor(c, { toolbar, panel, legend = '' }) {
+function mapEditor(c, opts) {
+  const { toolbar, panel, legend = '' } = opts;
   c.innerHTML = `<div class="toolbar">${toolbar}</div>${legend}<div class="editor"><div class="mapbox" id="emap"></div><div class="panel card" id="epanel">${panel}</div></div>`;
   const mv = new MapView($('#emap'), { src: mapFile?.url || S.map.src, width: S.map.width, height: S.map.height });
+  mv.drawBase(S.map, opts.graph === false ? null : S.graph, S.markers, { interactive: false });
   return mv;
 }
 function places(c) {
@@ -277,6 +279,7 @@ function places(c) {
     toolbar: `<button class="btn btn-primary btn-sm" id="padd">+ Add place</button>
       <label class="btn btn-ghost btn-sm">Replace map (PDF or image)<input type="file" id="pmap" accept="application/pdf,image/*" hidden></label>
       <button class="btn btn-ghost btn-sm" id="pscale">Set scale</button><button class="btn btn-ghost btn-sm" id="pgeo">GPS setup</button>
+      ${S.map.areas?.length ? `<select id="pstyle" style="max-width:190px"><option value="illustrated" ${S.map.style === 'illustrated' ? 'selected' : ''}>Illustrated map</option><option value="image" ${S.map.style !== 'illustrated' ? 'selected' : ''}>Original map image</option></select>` : ''}
       <select id="pfind" style="max-width:220px"><option value="">Find a place…</option>${placeOptions(null)}</select>`,
     panel: '<p class="muted">Click a place to edit it. Drag places to move them. Click <b>+ Add place</b>, then click the map to drop a new one.</p>',
   });
@@ -308,9 +311,10 @@ function places(c) {
   mv.onPointer = (phase, e, p, moved) => {
     if (phase === 'down') { const t = e.target.closest('[data-marker]'); if (!t) return false; drag = markerById(S, t.dataset.marker); return true; }
     if (phase === 'move' && drag) { drag.x = Math.round(p.x); drag.y = Math.round(p.y); draw(); }
-    if (phase === 'up' && drag) { const m = drag; drag = null; if (moved > 4) changed(); edit(m); }
+    if (phase === 'up' && drag) { const m = drag; drag = null; if (moved > 4) { changed(); if (m.category === 'cottage') mv.drawBase(S.map, S.graph, S.markers, { interactive: false }); } edit(m); }
   };
   draw(); requestAnimationFrame(() => mv.fit());
+  $('#pstyle') && ($('#pstyle').onchange = (e) => { S.map.style = e.target.value; changed(); places(c); });
   $('#padd').onclick = (e) => { adding = true; e.target.classList.add('on'); toast('Click on the map to place it'); };
   $('#pfind').onchange = (e) => { const m = markerById(S, e.target.value); if (m) { mv.focus([m], 80, 2); edit(m); } };
   $('#pmap').onchange = (e) => replaceMap(e.target.files[0]).then(() => places(c));
@@ -368,7 +372,7 @@ async function replaceMap(file) {
     S.map.metersPerPixel = +(S.map.metersPerPixel / ((kx + ky) / 2)).toFixed(4);
   }
   mapFile = { name: `map-${Date.now()}.jpg`, blob, url: URL.createObjectURL(blob) };
-  Object.assign(S.map, { width: W, height: H });
+  Object.assign(S.map, { width: W, height: H, style: 'image' });
   changed(); toast('Map replaced. Publish to make it live.');
 }
 
@@ -376,6 +380,7 @@ async function replaceMap(file) {
 function paths(c) {
   let sel = null, drag = null, testRoute = null;
   const mv = mapEditor(c, {
+    graph: false,
     toolbar: `<span class="muted">Click empty map to add a point. Click a point, then another, to connect them. Drag points to move them. Click a line to edit it.</span>`,
     legend: `<div class="legend" style="margin-bottom:10px"><span><i style="background:#1a73e8"></i>Walk & vehicle</span><span><i style="background:#2f9e5b"></i>Walk only</span><span><i style="background:#7a4fd6"></i>Vehicle only</span><span><i style="background:#b3261e"></i>Closed / restricted</span></div>`,
     panel: '',

@@ -2,6 +2,7 @@
 // Usage: node tools/seed.mjs <admin-password> [links-output-file]
 import { writeFileSync } from 'node:fs';
 import { buildPublic, toIso, randomToken } from '../js/core.js';
+import { areas, amphitheatre } from './areas.mjs';
 
 const [password, linksOut] = process.argv.slice(2);
 if (!password) { console.error('usage: node tools/seed.mjs <admin-password> [links-file]'); process.exit(1); }
@@ -90,7 +91,7 @@ const state = {
     contacts: [{ name: 'Navin Doshi', phone: '+919227160644' }, { name: 'Rohan', phone: '+918780466533' }, { name: 'Resort reception', phone: '+917622880002' }],
     mapsQuery: 'Neejanand Resort, Anand-Borsad Road, Anand, Gujarat',
   },
-  map: { src: 'data/map.jpg', width: 1600, height: 1131, metersPerPixel: 0.3, geo: null },
+  map: { src: 'data/map.jpg', width: 1600, height: 1131, metersPerPixel: 0.3, geo: null, style: 'illustrated', areas, amphitheatre, title: 'Neejanand', subtitle: 'LUXURIOUS RESORT · ANAND' },
   markers, graph, events,
   announcements: [{ id: 'a1', title: 'Welcome to Neejanand!', body: 'Check in at Reception near the main gate. Lunch is served after Haldi on Dec 4 and after the Pheras on Dec 5.', audience: { type: 'all' }, kind: 'general', published: true, createdAt: '2026-11-18T00:00:00.000Z' }],
   guests, secrets: {},
