@@ -28,6 +28,8 @@ async function boot() {
     if (guest) store.set('guestToken', token);
     else if (m) { view.innerHTML = `<div class="wrap"><div class="empty fade-in"><h2>This link isn't recognised</h2><p>Please ask the family for your personal link. You can still see the schedule and map.</p><a class="btn btn-primary" href="#/home">Continue</a></div></div>`; history.replaceState(null, '', '#/invalid'); return; }
   }
+  // Shared link: guests can pick their cottage once and it's remembered on this phone.
+  if (!guest && store.get('myCottage')) guest = { cottage: store.get('myCottage'), self: true };
   if (m) history.replaceState(null, '', '#/home');
   window.addEventListener('hashchange', route);
   route();
@@ -84,11 +86,12 @@ function home() {
       <div class="place">${esc(w.venueName)}</div>
     </header>
     <section class="card welcome center">
-      <div class="eyebrow">${guest ? 'A warm welcome to' : 'A warm welcome'}</div>
-      <div class="name">${guest ? esc(guest.family || guest.name) : 'Dear Guest'}</div>
+      <div class="eyebrow">${guest && !guest.self ? 'A warm welcome to' : 'A warm welcome'}</div>
+      <div class="name">${guest && !guest.self ? esc(guest.family || guest.name) : 'Dear Guest'}</div>
       <p class="muted">${esc(w.welcome)}</p>
       ${guest ? `<div class="stay" style="text-align:left"><div class="badge">${esc(guest.cottage)}</div><div style="flex:1"><div class="eyebrow">Your stay</div><div style="font:600 20px var(--serif)">Cottage ${esc(guest.cottage)}</div><a href="#/map/${esc(homeMarker()?.id || '')}" style="font-size:13px">View on resort map →</a></div></div>`
-      : `<p class="note" style="margin-top:12px">Opened from your personal link? It shows your cottage and directions from it.</p>`}
+      : cottagePicker()}
+      ${guest?.self ? `<p style="font-size:13px;margin-top:8px"><a href="#" id="chgCot">Not your cottage? Change it</a></p>` : ''}
     </section>
     ${ev ? `<section class="card next" style="${themeStyle(ev)}">
       <div class="art" style="background-image:url(${th.art})">${rel ? `<span class="pill">${esc(rel)}</span>` : ''}</div>
@@ -116,6 +119,22 @@ function home() {
     ${w.hosts ? `<div class="hosts"><div class="script">With Love</div><div class="names">${esc(w.hosts)}</div></div>` : ''}
     <img class="leaves" src="art/leaves.jpg" alt="" aria-hidden="true">
   </div>`;
+  bindHome();
+}
+
+function cottagePicker() {
+  const blocks = data.markers.filter((m) => m.category === 'cottage').map((m) => m.code).sort((a, b) => parseInt(a) - parseInt(b));
+  return `<form id="cotForm" class="stay" style="text-align:left;flex-wrap:wrap">
+    <div style="flex:1 1 100%"><div class="eyebrow">Where are you staying?</div><p class="muted" style="font-size:13px;margin:2px 0 8px">Choose your cottage to get walking times and directions from your door.</p></div>
+    <select id="cotBlock" style="flex:1" required><option value="">Cottage…</option>${blocks.map((b) => `<option>${esc(b)}</option>`).join('')}</select>
+    <select id="cotUnit" style="width:90px"><option value="">Unit</option>${['A', 'B', 'C', 'D'].map((u) => `<option>${u}</option>`).join('')}</select>
+    <button class="btn btn-primary">Save</button></form>`;
+}
+function bindHome() {
+  const f = $('#cotForm');
+  if (f) f.onsubmit = (e) => { e.preventDefault(); const c = $('#cotBlock').value + $('#cotUnit').value; if (!$('#cotBlock').value) return; store.set('myCottage', c); guest = { cottage: c, self: true }; home(); };
+  const ch = $('#chgCot');
+  if (ch) ch.onclick = (e) => { e.preventDefault(); store.set('myCottage', ''); guest = null; home(); };
 }
 
 function schedule() {
