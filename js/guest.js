@@ -1,6 +1,6 @@
 import {
   loadData, openGuest, publishedEvents, nextEvent, eventEnd, fmtTime, fmtDay, dayKey, relTime, markerById,
-  cottageMarker, findRoute, routeSteps, geoToMap, announcementsFor, CATEGORIES, esc,
+  cottageMarker, findRoute, routeSteps, geoToMap, announcementsFor, CATEGORIES, esc, themeOf,
 } from './core.js';
 import { MapView, markerCard } from './map.js';
 
@@ -63,67 +63,88 @@ function walkLine(e) {
 }
 const timeRange = (e) => `${fmtTime(e.start, tz)}${e.end ? ` – ${fmtTime(e.end, tz)}` : ' onwards'}`;
 
+const ORN = `<div class="orn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M12 3c2 3 2 6 0 9-2-3-2-6 0-9Zm0 18c-2-3-2-6 0-9 2 3 2 6 0 9ZM3 12c3-2 6-2 9 0-3 2-6 2-9 0Zm18 0c-3 2-6 2-9 0 3-2 6-2 9 0Z"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg></div>`;
+const ordinal = (n) => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : n % 10 < 4 ? n % 10 : 0] || 'th');
+const themeStyle = (e) => { const t = themeOf(e); return `--accent:${t.accent}`; };
+const splitTime = (iso) => { const t = fmtTime(iso, tz); return { hm: t.replace(/ ?(AM|PM)/, ''), ap: t.slice(-2) }; };
+
 function home() {
   const w = data.wedding, ev = nextEvent(data), v = ev && venueOf(ev);
-  const days = `${fmtDay(w.startDate + 'T12:00:00+05:30', tz, { day: 'numeric' })} & ${fmtDay(w.endDate + 'T12:00:00+05:30', tz, { day: 'numeric', month: 'long', year: 'numeric' })}`;
-  const rel = ev && relTime(ev.start);
-  const live = ev && new Date(ev.start) <= Date.now();
+  const d1 = +w.startDate.slice(8), d2 = +w.endDate.slice(8);
+  const month = fmtDay(w.endDate + 'T12:00:00+05:30', tz, { month: 'long', year: 'numeric' });
+  const rel = ev && relTime(ev.start), live = ev && new Date(ev.start) <= Date.now();
+  const t = ev && splitTime(ev.start), th = ev && themeOf(ev);
   view.innerHTML = `<div class="wrap stack fade-in">
     <header class="hero">
-      <div class="mono">${esc(w.couple.split('&').map((s) => s.trim()[0]).join(' · '))}</div>
+      <img class="wreath" src="art/monogram.jpg" alt="${esc(w.couple)} monogram">
+      <div class="invite">Welcome to the wedding celebrations of</div>
       <h1>${esc(w.couple)}</h1>
-      <div class="dates">${esc(days)} · ${esc(w.venueName)}</div>
+      ${ORN}
+      <div class="dates">${ordinal(d1)}${d2 !== d1 ? ` &amp; ${ordinal(d2)}` : ''} ${esc(month)}</div>
+      <div class="place">${esc(w.venueName)}</div>
     </header>
-    <section class="card">
-      <div class="eyebrow">${guest ? 'Welcome' : 'Welcome, guest'}</div>
-      <h2 style="margin:4px 0 6px">${guest ? esc(guest.family || guest.name) : 'to the celebrations'}</h2>
+    <section class="card welcome center">
+      <div class="eyebrow">${guest ? 'A warm welcome to' : 'A warm welcome'}</div>
+      <div class="name">${guest ? esc(guest.family || guest.name) : 'Dear Guest'}</div>
       <p class="muted">${esc(w.welcome)}</p>
-      ${guest ? `<div class="stay" style="margin-top:14px"><div class="badge">${esc(guest.cottage)}</div><div><div class="eyebrow">Your stay</div><div style="font-weight:600">Cottage ${esc(guest.cottage)}</div><a href="#/map/${esc(homeMarker()?.id || '')}" class="muted" style="font-size:13px">Show on map →</a></div></div>`
-      : `<p class="note" style="margin-top:12px">Opened from your personal link? It shows your cottage and walking directions from it.</p>`}
+      ${guest ? `<div class="stay" style="text-align:left"><div class="badge">${esc(guest.cottage)}</div><div style="flex:1"><div class="eyebrow">Your stay</div><div style="font:600 20px var(--serif)">Cottage ${esc(guest.cottage)}</div><a href="#/map/${esc(homeMarker()?.id || '')}" style="font-size:13px">View on resort map →</a></div></div>`
+      : `<p class="note" style="margin-top:12px">Opened from your personal link? It shows your cottage and directions from it.</p>`}
     </section>
-    ${ev ? `<section class="card next">
-      <div class="row between"><span class="eyebrow">${live ? 'Happening now' : 'Your next event'}</span>${rel ? `<span class="pill">${esc(rel)}</span>` : ''}</div>
-      <div class="time">${esc(fmtTime(ev.start, tz))}</div>
-      <h2>${esc(ev.name)}</h2>
-      <div class="meta"><span>${esc(fmtDay(ev.start, tz, { weekday: 'short', day: 'numeric', month: 'short' }))}</span><span>${ICON.pin} ${esc(v?.name || 'Venue to be announced')}</span><span>${walkLine(ev)}</span></div>
-      ${ev.change ? `<p style="margin-top:8px"><span class="pill">Updated</span> ${esc(ev.change)}</p>` : ''}
-      ${v ? `<a class="btn btn-primary btn-block" style="margin-top:16px" href="#/nav/${esc(v.id)}">Navigate to venue</a>` : ''}
-    </section>` : `<section class="card"><h3>That's a wrap!</h3><p class="muted">Thank you for celebrating with us.</p></section>`}
+    ${ev ? `<section class="card next" style="${themeStyle(ev)}">
+      <div class="art" style="background-image:url(${th.art})">${rel ? `<span class="pill">${esc(rel)}</span>` : ''}</div>
+      <div class="body">
+        <div class="eyebrow">${live ? 'Happening now' : 'Your next celebration'}</div>
+        <h2>${esc(ev.name)}</h2>
+        <div class="time">${esc(t.hm)}<small>${t.ap}</small></div>
+        <div class="meta"><span>${esc(fmtDay(ev.start, tz, { weekday: 'long', day: 'numeric', month: 'long' }))}</span></div>
+        <div class="meta"><span>${ICON.pin} ${esc(v?.name || 'Venue to be announced')}</span>${walkLine(ev) ? `<span>${walkLine(ev)}</span>` : ''}</div>
+        ${ev.dress ? `<div class="meta"><span>Dress: ${esc(ev.dress)}</span></div>` : ''}
+        ${ev.change ? `<p class="changed" style="margin-top:8px">Updated: ${esc(ev.change)}</p>` : ''}
+        ${v ? `<a class="btn btn-primary btn-block" style="margin-top:18px" href="#/nav/${esc(v.id)}">Navigate to venue</a>` : ''}
+      </div>
+    </section>` : `<section class="card center"><div class="script" style="font-size:40px">Thank you</div><p class="muted">for celebrating with us.</p></section>`}
     <section class="row" style="gap:10px">
       <a class="btn btn-ghost" style="flex:1" href="#/schedule">Full schedule</a>
       <a class="btn btn-ghost" style="flex:1" href="#/map">Resort map</a>
     </section>
     <section class="card">
-      <div class="eyebrow" style="margin-bottom:6px">Need help?</div>
-      ${(w.contacts || []).map((c) => `<div class="contact"><span>${esc(c.name)}</span><span class="row" style="gap:8px"><a class="btn btn-sm btn-ghost" href="tel:${esc(c.phone)}">Call</a><a class="btn btn-sm btn-ghost" href="https://wa.me/${esc(c.phone.replace(/\D/g, ''))}" target="_blank" rel="noopener">WhatsApp</a></span></div>`).join('')}
-      ${w.mapsQuery ? `<div class="contact"><span>Getting to the resort</span><a class="btn btn-sm btn-ghost" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(w.mapsQuery)}">Google Maps</a></div>` : ''}
+      <div class="eyebrow" style="margin-bottom:6px">At your service</div>
+      ${(w.contacts || []).map((c) => `<div class="contact"><span style="font:600 18px var(--serif)">${esc(c.name)}</span><span class="row" style="gap:8px"><a class="btn btn-sm btn-ghost" href="tel:${esc(c.phone)}">Call</a><a class="btn btn-sm btn-ghost" href="https://wa.me/${esc(c.phone.replace(/\D/g, ''))}" target="_blank" rel="noopener">WhatsApp</a></span></div>`).join('')}
+      ${w.mapsQuery ? `<div class="contact"><span style="font:600 18px var(--serif)">Getting to the resort</span><a class="btn btn-sm btn-ghost" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(w.mapsQuery)}">Google Maps</a></div>` : ''}
     </section>
+    ${w.blessing ? `<p class="blessing">${esc(w.blessing)}</p>` : ''}
+    ${w.hosts ? `<div class="hosts"><div class="script">With Love</div><div class="names">${esc(w.hosts)}</div></div>` : ''}
+    <img class="leaves" src="art/leaves.jpg" alt="" aria-hidden="true">
   </div>`;
 }
 
 function schedule() {
   const evs = publishedEvents(data), nx = nextEvent(data);
-  if (!evs.length) { view.innerHTML = `<div class="wrap"><div class="empty"><h2>Schedule coming soon</h2><p>Check back shortly.</p></div></div>`; return; }
+  if (!evs.length) { view.innerHTML = `<div class="wrap"><div class="empty"><h2>Coming soon</h2><p>The schedule will appear here shortly.</p></div></div>`; return; }
   const byDay = {};
   for (const e of evs) (byDay[dayKey(e.start, tz)] ||= []).push(e);
-  view.innerHTML = `<div class="wrap fade-in"><h1 style="margin:6px 0 4px">Schedule</h1><p class="muted">All times are India time (IST).</p>
+  const dayNames = ['One', 'Two', 'Three', 'Four', 'Five'];
+  view.innerHTML = `<div class="wrap fade-in"><div class="page-title"><h1>The Celebrations</h1>${ORN}<p class="muted" style="font-size:13px">All times are India time (IST)</p></div>
     ${Object.entries(byDay).map(([d, list], i) => `<section>
-      <div class="day-head"><h2>Day ${i + 1}</h2><span class="muted">${esc(fmtDay(list[0].start, tz))}</span></div>
-      <div class="stack">${list.map((e) => {
-        const v = venueOf(e), past = new Date(eventEnd(e)) < Date.now();
-        return `<article class="card ev ${past ? 'past' : ''} ${nx?.id === e.id ? 'is-next' : ''}">
-          <div class="t">${esc(fmtTime(e.start, tz).replace(/ (AM|PM)/, ''))}<small>${esc(fmtTime(e.start, tz).slice(-2))}${e.end ? ` – ${esc(fmtTime(e.end, tz))}` : ' onwards'}</small></div>
+      <div class="day-head"><div class="script">Day ${dayNames[i] || i + 1}</div><div class="muted">${esc(fmtDay(list[0].start, tz))}</div></div>
+      <div class="stack">${list.map((e, j) => {
+        const v = venueOf(e), past = new Date(eventEnd(e)) < Date.now(), t = splitTime(e.start), th = themeOf(e);
+        const banner = j === 0 || list[j - 1].theme !== e.theme;
+        return `<article class="card ev ${past ? 'past' : ''} ${nx?.id === e.id ? 'is-next' : ''}" style="${themeStyle(e)}">
+          ${banner ? `<div class="ev-art" style="background-image:url(${th.art})"></div>` : ''}
+          <div class="t">${esc(t.hm)}<small>${t.ap}${e.end ? `<br>to ${esc(fmtTime(e.end, tz))}` : '<br>onwards'}</small></div>
           <div>
             ${nx?.id === e.id ? '<div class="tag">Up next</div>' : ''}
             <h3>${esc(e.name)}</h3>
-            <div class="muted" style="font-size:14px">${ICON.pin} ${esc(v?.name || 'Venue TBA')}${!past ? ` · ${walkLine(e).replace(ICON.walk + ' ', '')}` : ''}</div>
+            <div class="muted" style="font-size:14px">${ICON.pin} ${esc(v?.name || 'Venue TBA')}${!past && walkLine(e) ? ` · ${walkLine(e).replace(ICON.walk + ' ', '')}` : ''}</div>
             ${e.change ? `<div class="changed">Updated: ${esc(e.change)}</div>` : ''}
             ${e.description ? `<p style="font-size:14px">${esc(e.description)}</p>` : ''}
-            ${e.dress ? `<p style="font-size:13px"><b>Dress code:</b> ${esc(e.dress)}</p>` : ''}
-            ${e.image ? `<img src="${esc(e.image)}" alt="" loading="lazy" style="width:100%;border-radius:12px;margin-top:6px">` : ''}
-            ${v && !past ? `<a class="btn btn-sm btn-primary" style="margin-top:8px" href="#/nav/${esc(v.id)}">Navigate</a>` : ''}
+            ${e.dress ? `<p style="font-size:13px"><span class="tag">Dress</span> ${esc(e.dress)}</p>` : ''}
+            ${e.image ? `<img src="${esc(e.image)}" alt="" loading="lazy" style="width:100%;border-radius:14px;margin-top:6px">` : ''}
+            ${v && !past ? `<a class="btn btn-sm btn-primary" style="margin-top:10px;background:var(--accent)" href="#/nav/${esc(v.id)}">Navigate</a>` : ''}
           </div></article>`;
       }).join('')}</div></section>`).join('')}
+    <img class="leaves" src="art/leaves.jpg" alt="" aria-hidden="true">
   </div>`;
 }
 
@@ -189,7 +210,7 @@ function nav(destId) {
   const renderSheet = (r) => {
     const steps = r ? routeSteps(data, r, from.name, dest.name) : [];
     $('#sheet').innerHTML = `<div class="sheet" style="max-height:45%">
-      <div class="row between"><div><div class="eyebrow">Directions to</div><h3>${esc(dest.name)}</h3></div><a href="#/map" class="btn btn-sm btn-ghost">Close</a></div>
+      <div class="row between"><div><div class="eyebrow">Directions to</div><h3 style="font-size:26px">${esc(dest.name)}</h3></div><a href="#/map" class="btn btn-sm btn-ghost">Close</a></div>
       ${r ? `<div class="route-sum" style="margin-top:8px"><b>${r.minutes} min</b><span class="muted">${Math.round(r.meters)} m · ${mode === 'walk' ? 'walking' : 'by buggy/car'}</span></div>`
         : `<p class="note">No ${mode === 'walk' ? 'walking' : 'vehicle'} route is mapped between these places yet. Please ask at Reception.</p>`}
       <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:8px">
@@ -245,7 +266,7 @@ function updateBadge() {
 function updates() {
   const list = updatesList();
   store.set(seenKey(), JSON.stringify(list.map((u) => u.id)));
-  view.innerHTML = `<div class="wrap stack fade-in"><h1 style="margin-top:6px">Updates</h1>
+  view.innerHTML = `<div class="wrap stack fade-in"><div class="page-title"><h1>Updates</h1>${ORN}</div>
     ${list.length ? list.map((u) => `<article class="card ann k-${u.kind || 'general'}">
       <div class="eyebrow">${{ reminder: 'Reminder', change: 'Schedule change', venue: 'Venue change', general: 'Announcement', important: 'Important' }[u.kind] || 'Announcement'}</div>
       <h3 style="margin:2px 0 4px">${esc(u.title)}</h3><p>${esc(u.body)}</p>

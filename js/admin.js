@@ -1,6 +1,6 @@
 import {
   loadData, openAdmin, buildPublic, randomToken, uid, fmtTime, fmtDay, toIso, fromIso, markerById, cottageMarker,
-  findRoute, routeSteps, CATEGORIES, esc, b64, publishedEvents,
+  findRoute, routeSteps, CATEGORIES, esc, b64, publishedEvents, THEMES,
 } from './core.js';
 import { MapView } from './map.js';
 
@@ -239,6 +239,7 @@ function editEvent(ev, after) {
   modal(`<h3>${isNew ? 'Add event' : 'Edit event'}</h3><form class="stack" id="ef">
     <label class="f">Event name<input name="name" value="${esc(ev.name || '')}" required></label>
     <div class="grid3"><label class="f">Date<input type="date" name="date" value="${s.date}" required></label><label class="f">Starts<input type="time" name="start" value="${s.time}" required></label><label class="f">Ends (optional)<input type="time" name="end" value="${en?.time || ''}"></label></div>
+    <label class="f">Look (artwork from the invitation)<select name="theme">${Object.entries(THEMES).map(([k, t]) => `<option value="${k}" ${(ev.theme || 'wedding') === k ? 'selected' : ''}>${t.label}</option>`).join('')}</select></label>
     <label class="f">Venue<select name="venue" required><option value="">Choose a place on the map…</option>${placeOptions(ev.venue)}</select></label>
     <label class="f">Description<textarea name="description" rows="3">${esc(ev.description || '')}</textarea></label>
     <div class="grid2"><label class="f">Dress code (optional)<input name="dress" value="${esc(ev.dress || '')}"></label><label class="f">Venue image URL (optional)<input name="image" value="${esc(ev.image || '')}"></label></div>
@@ -249,7 +250,7 @@ function editEvent(ev, after) {
     $('#ef', m).onsubmit = (e) => {
       e.preventDefault();
       const d = formData(e.target);
-      Object.assign(ev, { name: d.name, venue: d.venue, description: d.description, dress: d.dress, image: d.image, change: d.change, published: !!d.published,
+      Object.assign(ev, { name: d.name, theme: d.theme, venue: d.venue, description: d.description, dress: d.dress, image: d.image, change: d.change, published: !!d.published,
         start: toIso(d.date, d.start), end: d.end ? toIso(d.date, d.end) : null });
       if (!isNew && !d.change && (ev.start !== old.start || ev.venue !== old.venue)) {
         // Make sure guests hear about time/venue moves even if the admin forgets a note.
@@ -482,6 +483,8 @@ function settings(c) {
       <div class="grid2"><label class="f">First day<input type="date" name="startDate" value="${esc(w.startDate)}"></label><label class="f">Last day<input type="date" name="endDate" value="${esc(w.endDate)}"></label></div>
       <div class="grid2"><label class="f">Venue name<input name="venueName" value="${esc(w.venueName)}"></label><label class="f">Google Maps search for the resort<input name="mapsQuery" value="${esc(w.mapsQuery || '')}"></label></div>
       <label class="f">Welcome message<textarea name="welcome" rows="2">${esc(w.welcome)}</textarea></label>
+      <label class="f">Blessing (shown at the bottom of the home screen)<textarea name="blessing" rows="2">${esc(w.blessing || '')}</textarea></label>
+      <label class="f">"With Love" from<input name="hosts" value="${esc(w.hosts || '')}"></label>
       <label class="f">Help contacts (one per line: Name, +91 phone)<textarea name="contacts" rows="3">${esc((w.contacts || []).map((x) => `${x.name}, ${x.phone}`).join('\n'))}</textarea></label>
       <div><button class="btn btn-primary btn-sm">Save</button></div></form>
     <form class="card stack" id="sl"><h3>Guest links</h3><label class="f">Guest app address<input name="publicUrl" value="${esc(S.secrets.publicUrl)}"></label><p class="muted" style="font-size:12px">Personal links and QR codes are built from this address.</p><div><button class="btn btn-primary btn-sm">Save</button></div></form>

@@ -95,8 +95,8 @@ export function nextEvent(data, now = Date.now()) {
 
 // ---------- Places ----------
 export const CATEGORIES = {
-  venue: { label: 'Wedding venue', color: '#2f5d46', icon: '♥' },
-  cottage: { label: 'Cottage', color: '#8a6d3b', icon: '⌂' },
+  venue: { label: 'Wedding venue', color: '#b02a5b', icon: '♥' },
+  cottage: { label: 'Cottage', color: '#a8813f', icon: '⌂' },
   entrance: { label: 'Main entrance', color: '#1f4e79', icon: '⇥' },
   reception: { label: 'Reception', color: '#1f4e79', icon: 'i' },
   restaurant: { label: 'Restaurant', color: '#a0522d', icon: '☕' },
@@ -105,6 +105,14 @@ export const CATEGORIES = {
   emergency: { label: 'Emergency help', color: '#b3261e', icon: '+' },
   other: { label: 'Other facility', color: '#6b6b6b', icon: '•' },
 };
+// Visual themes taken from the invitation pages.
+export const THEMES = {
+  haldi: { label: 'Haldi (saffron)', art: 'art/haldi.jpg', accent: '#c96a12', soft: '#fdf0dc' },
+  sangeet: { label: 'Sangeet (night blue)', art: 'art/sangeet.jpg', accent: '#24407a', soft: '#e6ecf7' },
+  wedding: { label: 'Wedding (rose)', art: 'art/wedding.jpg', accent: '#b02a5b', soft: '#fbe6ee' },
+  welcome: { label: 'Welcome (terracotta)', art: 'art/welcome.jpg', accent: '#b3583a', soft: '#fbe9e1' },
+};
+export const themeOf = (e) => THEMES[e?.theme] || THEMES.wedding;
 export const markerById = (data, id) => (data.markers || []).find((m) => m.id === id);
 // Guest cottage "15B" matches marker code "15B", otherwise block "15".
 export function cottageMarker(data, cottage) {

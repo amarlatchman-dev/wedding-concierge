@@ -62,7 +62,7 @@ const graph = {
 };
 
 const ev = (id, name, date, start, end, venue, description, extra = {}) =>
-  ({ id, name, start: toIso(date, start), end: end ? toIso(date, end) : null, venue, description, published: true, ...extra });
+  ({ id, name, start: toIso(date, start), end: end ? toIso(date, end) : null, venue, description, published: true, theme: { ganesh: 'haldi', muhurat: 'haldi', haldi: 'haldi', sangeet: 'sangeet' }[id] || 'wedding', ...extra });
 const events = [
   ev('ganesh', 'Ganesh Pujan', '2026-12-04', '08:00', '09:00', 'jalsa', 'A morning prayer to Lord Ganesha to bless the celebrations ahead.'),
   ev('muhurat', 'Ghehu-Channa Muhurat', '2026-12-04', '09:00', '10:30', 'jalsa', 'The traditional Mandva Mahurat ceremony.'),
@@ -84,6 +84,8 @@ const state = {
   wedding: {
     couple: 'Rohan & Gazal', title: "Rohan & Gazal's Wedding", startDate: '2026-12-04', endDate: '2026-12-05', timezone: 'Asia/Kolkata',
     venueName: 'Neejanand Luxurious Resort', venueAddress: 'Anand-Borsad Road, Nr. Andharia Chakla, Khandhali, Anand, Gujarat 388560',
+    hosts: 'Mr. Navin Doshi · Mrs. Savita Doshi · Ms. Alpa Doshi',
+    blessing: 'Your presence and blessings would bring immense joy to us as Rohan and Gazal begin their new journey together.',
     welcome: 'We are so happy you are here. Everything you need for the celebrations is in this app.',
     contacts: [{ name: 'Navin Doshi', phone: '+919227160644' }, { name: 'Rohan', phone: '+918780466533' }, { name: 'Resort reception', phone: '+917622880002' }],
     mapsQuery: 'Neejanand Resort, Anand-Borsad Road, Anand, Gujarat',
