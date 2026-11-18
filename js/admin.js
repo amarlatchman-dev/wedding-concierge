@@ -53,7 +53,7 @@ const placeOptions = (sel, filter = () => true) => S.markers.filter(filter).sort
   .map((m) => `<option value="${m.id}" ${m.id === sel ? 'selected' : ''}>${esc(m.name)}${m.category !== 'venue' ? ` (${CATEGORIES[m.category]?.label})` : ''}</option>`).join('');
 
 // ---------- Shell ----------
-const TABS = [['overview', 'Overview'], ['guests', 'Guests'], ['events', 'Events'], ['places', 'Map & places'], ['paths', 'Walking paths'], ['announce', 'Announcements'], ['settings', 'Settings']];
+const TABS = [['overview', 'Overview'], ['guests', 'Guests'], ['events', 'Events'], ['places', 'Map & places'], ['paths', 'Walking paths'], ['announce', 'Announcements'], ['whatsapp', 'WhatsApp'], ['settings', 'Settings']];
 function render() {
   app.innerHTML = `<div class="shell">
     <nav class="side"><h2>${esc(S.wedding.couple)}</h2>${TABS.map(([k, l]) => `<a href="#/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}
@@ -64,7 +64,7 @@ function render() {
       <div class="content" id="content"></div>
     </div></div>`;
   $('#publish').onclick = publish;
-  ({ overview, guests, events, places, paths, announce, settings }[tab] || overview)($('#content'));
+  ({ overview, guests, events, places, paths, announce, whatsapp, settings }[tab] || overview)($('#content'));
 }
 
 // ---------- Publish ----------
@@ -504,4 +504,97 @@ function settings(c) {
   $('#sl').onsubmit = (e) => { e.preventDefault(); S.secrets.publicUrl = formData(e.target).publicUrl.trim(); changed(); toast('Saved'); };
   $('#sg').onsubmit = (e) => { e.preventDefault(); S.secrets.github = formData(e.target); changed(); toast('Saved. Publish to store it.'); };
   $('#sp').onsubmit = (e) => { e.preventDefault(); const p = formData(e.target).pw; if (p.length < 10) return toast('Use at least 10 characters'); password = p; changed(); toast('Password changed. Publish to apply it.'); };
+}
+
+// ---------- WhatsApp ----------
+// Messages are written to stand on their own, so guests who never open the app still know where to go.
+// Sending uses WhatsApp click-to-chat: one tap per guest opens WhatsApp with the message ready.
+const WA_TEMPLATES = {
+  event: { label: 'Event reminder', text: `🌸 *{couple}* 🌸\n\nNamaste {name}!\n*{event}* begins at *{time}* on {date}.\n📍 Venue: *{venue}*\n🚶 About {walk} walk from Cottage {cottage}\n{directions}\n{dress}\nSee you there! 🙏\n{link}` },
+  day: { label: "Day's schedule", text: `🌸 *{couple}* 🌸\n\nNamaste {name}! Here's the plan for *{date}*:\n\n{schedule}\n\nYou're staying in Cottage {cottage}.\n{link}` },
+  change: { label: 'Schedule change', text: `⚠️ *Update: {event}*\n\nNamaste {name}, {change}.\n*{event}* is now at *{time}* on {date}, at *{venue}* (about {walk} walk from Cottage {cottage}).\n{link}` },
+  custom: { label: 'Custom message', text: `🌸 *{couple}* 🌸\n\nNamaste {name}!\n\n` },
+};
+const waSentKey = (k) => `wa-sent:${k}`;
+const waSent = (k) => { try { return new Set(JSON.parse(localStorage.getItem(waSentKey(k)) || '[]')); } catch { return new Set(); } };
+const waMark = (k, id) => { const s = waSent(k); s.add(id); try { localStorage.setItem(waSentKey(k), JSON.stringify([...s])); } catch {} };
+const waPhone = (p) => { let d = String(p || '').replace(/\D/g, ''); if (d.length === 10) d = '91' + d; return d.length >= 11 ? d : ''; };
+
+function waFill(text, g, ev, day) {
+  const v = ev && markerById(S, ev.venue), home = g && cottageMarker(S, g.cottage);
+  const r = v && home ? findRoute(S, home, v) : null;
+  const steps = r ? routeSteps(S, r, `Cottage ${g.cottage}`, v.name).slice(1).map((x) => x.text) : [];
+  const dayEvents = day ? publishedEvents(S).filter((e) => fromIso(e.start, tz()).date === day) : [];
+  const vars = {
+    couple: S.wedding.title || S.wedding.couple, name: g ? (g.name || '').split(' ')[0] || g.family : 'everyone', family: g?.family || '',
+    cottage: g?.cottage || '—', link: g ? `Your guide & map: ${linkFor(g)}` : `Schedule & map: ${S.secrets.publicUrl}`,
+    event: ev?.name || '', time: ev ? fmtTime(ev.start, tz()) : '', date: ev ? fmtDay(ev.start, tz()) : day ? fmtDay(toIso(day, '12:00'), tz()) : '',
+    venue: v?.name || '', walk: r ? `${r.minutes} min` : 'a short', change: ev?.change || 'there is a change to the schedule',
+    directions: steps.length ? `\n🗺️ How to get there:\n${steps.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n` : '',
+    dress: ev?.dress ? `👗 Dress: ${ev.dress}\n` : '',
+    schedule: dayEvents.map((e) => `• *${fmtTime(e.start, tz())}*: ${e.name} at ${markerById(S, e.venue)?.name || 'TBA'}`).join('\n'),
+  };
+  return text.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m)).replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function whatsapp(c) {
+  const evs = publishedEvents(S);
+  const days = [...new Set(evs.map((e) => fromIso(e.start, tz()).date))];
+  const nx = evs.find((e) => new Date(e.start) > Date.now()) || evs[0];
+  let st = { kind: 'event', event: nx?.id, day: days[0], audience: 'all', value: '', text: WA_TEMPLATES.event.text };
+  c.innerHTML = `<div class="stack">
+    <div class="card"><h3>Send on WhatsApp</h3><p class="muted" style="font-size:13px">Pick a message, check the preview, then tap <b>Send</b> by each guest. WhatsApp opens with that guest's personal message ready, and you press send. Messages include the time, venue and walking directions, so they work even for guests who never open the app. Sending happens from your own WhatsApp.</p></div>
+    <div class="editor" style="height:auto;grid-template-columns:1fr 1fr">
+      <div class="card stack">
+        <div class="grid2"><label class="f">Message type<select id="wkind">${Object.entries(WA_TEMPLATES).map(([k, t]) => `<option value="${k}">${t.label}</option>`).join('')}</select></label>
+          <label class="f" id="wevw">Event<select id="wev">${evs.map((e) => `<option value="${e.id}" ${e.id === st.event ? 'selected' : ''}>${esc(fmtDay(e.start, tz(), { day: 'numeric', month: 'short' }))} · ${esc(fmtTime(e.start, tz()))} · ${esc(e.name)}</option>`).join('')}</select></label>
+          <label class="f" id="wdayw" style="display:none">Day<select id="wday">${days.map((d) => `<option value="${d}">${esc(fmtDay(toIso(d, '12:00'), tz()))}</option>`).join('')}</select></label></div>
+        <div class="grid2"><label class="f">Send to<select id="waud"><option value="all">All guests</option><option value="group">A guest group</option><option value="cottages">Selected cottages</option></select></label>
+          <label class="f" id="wvalw" style="display:none">Group / cottages<input id="wval" placeholder="Bride side  or  15, 21A"></label></div>
+        <label class="f">Message (placeholders in {braces} are filled in for each guest)<textarea id="wtext" rows="13" style="font-family:ui-monospace,monospace;font-size:12.5px"></textarea></label>
+        <p class="muted" style="font-size:12px">Placeholders: {name} {family} {cottage} {event} {time} {date} {venue} {walk} {directions} {dress} {schedule} {change} {link}</p>
+        <div class="row" style="flex-wrap:wrap"><button class="btn btn-ghost btn-sm" id="wgroup">Copy version for a WhatsApp group / broadcast list</button><a class="btn btn-ghost btn-sm" id="wshare" target="_blank" rel="noopener">Share to a group…</a></div>
+      </div>
+      <div class="card stack"><div class="row between"><h3>Preview</h3><span class="muted" id="wpname"></span></div>
+        <div id="wprev" style="white-space:pre-wrap;background:#e7f7dc;color:#1b1b1b;border-radius:12px 12px 12px 2px;padding:12px 14px;font-size:14px;line-height:1.45;max-height:420px;overflow:auto"></div></div>
+    </div>
+    <div class="card"><div class="row between" style="flex-wrap:wrap"><h3>Recipients</h3><div class="row"><span class="muted" id="wcount"></span><button class="btn btn-primary btn-sm" id="wnext">Send to next guest</button></div></div><div id="wlist" style="margin-top:10px"></div></div>
+  </div>`;
+  const key = () => `${st.kind}:${st.kind === 'day' ? st.day : st.event}:${st.text.length}`;
+  const recipients = () => S.guests.filter((g) => {
+    if (st.audience === 'group') return (g.group || '').toLowerCase() === st.value.trim().toLowerCase();
+    if (st.audience === 'cottages') { const vals = st.value.toUpperCase().split(',').map((x) => x.trim()).filter(Boolean); const cot = (g.cottage || '').toUpperCase(); return vals.includes(cot) || vals.includes((cot.match(/^\d+/) || [''])[0]); }
+    return true;
+  });
+  const msgFor = (g) => waFill(st.text, g, st.kind === 'day' ? null : S.events.find((e) => e.id === st.event), st.kind === 'day' ? st.day : null);
+  const waUrl = (g) => `https://wa.me/${waPhone(g.phone)}?text=${encodeURIComponent(msgFor(g))}`;
+  const refresh = () => {
+    const list = recipients(), sent = waSent(key()), withPhone = list.filter((g) => waPhone(g.phone));
+    const sample = withPhone[0] || list[0] || null;
+    $('#wprev').textContent = waFill(st.text, sample, st.kind === 'day' ? null : S.events.find((e) => e.id === st.event), st.kind === 'day' ? st.day : null);
+    $('#wpname').textContent = sample ? `as sent to ${sample.family || sample.name}` : '';
+    $('#wcount').textContent = `${withPhone.filter((g) => sent.has(g.id)).length} of ${withPhone.length} sent${list.length > withPhone.length ? ` · ${list.length - withPhone.length} without a phone number` : ''}`;
+    $('#wshare').href = `https://wa.me/?text=${encodeURIComponent(waFill(st.text, null, st.kind === 'day' ? null : S.events.find((e) => e.id === st.event), st.kind === 'day' ? st.day : null))}`;
+    $('#wlist').innerHTML = list.length ? `<table><tbody>${list.map((g) => {
+      const ph = waPhone(g.phone), done = sent.has(g.id);
+      return `<tr data-id="${g.id}"><td><b>${esc(g.family || g.name)}</b><div class="muted" style="font-size:12px">Cottage ${esc(g.cottage)} · ${ph ? '+' + ph : 'no phone number'}</div></td>
+        <td style="text-align:right">${ph ? `<a class="btn btn-sm ${done ? 'btn-ghost' : 'btn-primary'}" target="_blank" rel="noopener" href="${waUrl(g)}" data-send>${done ? 'Sent ✓ · resend' : 'Send'}</a>` : '<a class="btn btn-sm btn-ghost" href="#/guests">Add number</a>'}</td></tr>`;
+    }).join('')}</tbody></table>` : '<div class="empty">No guests match.</div>';
+  };
+  const setKind = (k) => { st.kind = k; st.text = WA_TEMPLATES[k].text; $('#wtext').value = st.text; $('#wevw').style.display = k === 'day' ? 'none' : ''; $('#wdayw').style.display = k === 'day' ? '' : 'none'; refresh(); };
+  $('#wtext').value = st.text;
+  $('#wkind').onchange = (e) => setKind(e.target.value);
+  $('#wev').onchange = (e) => { st.event = e.target.value; refresh(); };
+  $('#wday').onchange = (e) => { st.day = e.target.value; refresh(); };
+  $('#waud').onchange = (e) => { st.audience = e.target.value; $('#wvalw').style.display = st.audience === 'all' ? 'none' : ''; refresh(); };
+  $('#wval').oninput = (e) => { st.value = e.target.value; refresh(); };
+  $('#wtext').oninput = (e) => { st.text = e.target.value; refresh(); };
+  $('#wlist').onclick = (e) => { const a = e.target.closest('[data-send]'); if (a) { waMark(key(), a.closest('tr').dataset.id); setTimeout(refresh, 300); } };
+  $('#wnext').onclick = () => {
+    const sent = waSent(key()), g = recipients().find((x) => waPhone(x.phone) && !sent.has(x.id));
+    if (!g) return toast('Everyone with a number has been sent this message.');
+    window.open(waUrl(g), '_blank'); waMark(key(), g.id); refresh();
+  };
+  $('#wgroup').onclick = () => navigator.clipboard.writeText($('#wshare').href ? waFill(st.text, null, st.kind === 'day' ? null : S.events.find((e) => e.id === st.event), st.kind === 'day' ? st.day : null) : '').then(() => toast('Copied. Paste it into your WhatsApp group or broadcast list.'));
+  refresh();
 }

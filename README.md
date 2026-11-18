@@ -19,6 +19,9 @@ Admins draw a path network (points and segments, each marked walk, vehicle or bo
 Places join the network at the nearest point on a segment. Distance comes from `metersPerPixel` (set with **Set scale**), and walking time assumes 1.2 m/s.
 GPS is used only after two lat/lng anchor points are set under **GPS setup**. Otherwise directions start from the guest's cottage.
 
-## WhatsApp (future)
-Announcements carry `audience` and `channels` fields (`['in_app']` today). A WhatsApp sender, such as the Cloud API from a small serverless function, can read
-published announcements plus guest phone numbers from the admin export and deliver them. Until then, admins send each guest's personal link with the "Send on WhatsApp" button.
+## WhatsApp
+**Admin → WhatsApp** writes complete messages for each guest: event reminders, the day's schedule, and schedule changes. Each one includes the time, the venue, walking directions from that guest's cottage, the dress code and their personal link, so it works even for guests who never open the app.
+Sending uses WhatsApp click-to-chat. Tap **Send** (or **Send to next guest**) and WhatsApp opens with the message ready, sent from the organizer's own number. Sent status is remembered in that browser.
+A general version (no names) can be copied into a WhatsApp group or broadcast list.
+
+Automatic sending (no taps) would need the WhatsApp Business Cloud API, run from a scheduled GitHub Action. That requires a Meta Business account, a dedicated phone number and approved message templates.

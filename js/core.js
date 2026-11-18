@@ -189,13 +189,15 @@ export function routeSteps(data, route, fromName, toName) {
     let turn = ((a2 - a1) * 180) / Math.PI;
     turn = ((turn + 540) % 360) - 180;
     if (Math.abs(turn) < 35) continue;
+    // Ignore tiny jogs in the path; only call out turns after a real stretch of walking.
+    if (run * mpp < 25 && steps.length > 1) continue;
     const dir = turn > 0 ? 'right' : 'left'; // screen y points down, so positive = clockwise = right
     const slight = Math.abs(turn) < 60 ? 'slight ' : '';
     steps.push({ text: `Walk ${roundM(run * mpp)}, then turn ${slight}${dir}${near(pts[i])}`, at: pts[i] });
     run = 0;
   }
   run += dist(pts.at(-1), pts.at(-2) || pts.at(-1));
-  steps.push({ text: `Walk ${roundM(run * mpp)} to arrive at ${toName}`, at: pts.at(-1) });
+  steps.push({ text: run * mpp < 25 ? `${toName} is just ahead` : `Walk ${roundM(run * mpp)} to arrive at ${toName}`, at: pts.at(-1) });
   return steps;
 }
 export const roundM = (m) => (m < 100 ? `${Math.max(10, Math.round(m / 10) * 10)} m` : m < 1000 ? `${Math.round(m / 25) * 25} m` : `${(m / 1000).toFixed(1)} km`);
