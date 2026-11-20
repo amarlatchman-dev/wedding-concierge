@@ -35,7 +35,7 @@ async function boot() {
   route();
   setInterval(() => { if (/^#\/(home|schedule)?$/.test(location.hash) || !location.hash) route(); }, 60000);
   refreshLoop();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register(new URL('../sw.js', import.meta.url)).catch(() => {});
 }
 
 // Re-fetch every 2 minutes so schedule changes appear without a reload.
@@ -78,7 +78,7 @@ function home() {
   const t = ev && splitTime(ev.start), th = ev && themeOf(ev);
   view.innerHTML = `<div class="wrap stack fade-in">
     <header class="hero">
-      <img class="wreath" src="art/monogram.jpg" alt="${esc(w.couple)} monogram">
+      ${data.wedding.art !== false ? `<img class="wreath" src="art/monogram.jpg" alt="${esc(w.couple)} monogram">` : ''}
       <div class="invite">Welcome to the wedding celebrations of</div>
       <h1>${esc(w.couple)}</h1>
       ${ORN}
@@ -94,7 +94,7 @@ function home() {
       ${guest?.self ? `<p style="font-size:13px;margin-top:8px"><a href="#" id="chgCot">Not your cottage? Change it</a></p>` : ''}
     </section>
     ${ev ? `<section class="card next" style="${themeStyle(ev)}">
-      <div class="art" style="background-image:url(${th.art})">${rel ? `<span class="pill">${esc(rel)}</span>` : ''}</div>
+      <div class="art" style="${data.wedding.art !== false ? `background-image:url(${th.art})` : `height:70px;background:linear-gradient(135deg, var(--rose-soft), transparent)`}">${rel ? `<span class="pill">${esc(rel)}</span>` : ''}</div>
       <div class="body">
         <div class="eyebrow">${live ? 'Happening now' : 'Your next celebration'}</div>
         <h2>${esc(ev.name)}</h2>
@@ -117,13 +117,14 @@ function home() {
     </section>
     ${w.blessing ? `<p class="blessing">${esc(w.blessing)}</p>` : ''}
     ${w.hosts ? `<div class="hosts"><div class="script">With Love</div><div class="names">${esc(w.hosts)}</div></div>` : ''}
-    <img class="leaves" src="art/leaves.jpg" alt="" aria-hidden="true">
+    ${data.wedding.art !== false ? '<img class="leaves" src="art/leaves.jpg" alt="" aria-hidden="true">' : ''}
   </div>`;
   bindHome();
 }
 
 function cottagePicker() {
   const blocks = data.markers.filter((m) => m.category === 'cottage').map((m) => m.code).sort((a, b) => parseInt(a) - parseInt(b));
+  if (!blocks.length) return '';
   return `<form id="cotForm" class="stay" style="text-align:left;flex-wrap:wrap">
     <div style="flex:1 1 100%"><div class="eyebrow">Where are you staying?</div><p class="muted" style="font-size:13px;margin:2px 0 8px">Choose your cottage to get walking times and directions from your door.</p></div>
     <select id="cotBlock" style="flex:1" required><option value="">Cottage…</option>${blocks.map((b) => `<option>${esc(b)}</option>`).join('')}</select>
@@ -150,7 +151,7 @@ function schedule() {
         const v = venueOf(e), past = new Date(eventEnd(e)) < Date.now(), t = splitTime(e.start), th = themeOf(e);
         const banner = j === 0 || list[j - 1].theme !== e.theme;
         return `<article class="card ev ${past ? 'past' : ''} ${nx?.id === e.id ? 'is-next' : ''}" style="${themeStyle(e)}">
-          ${banner ? `<div class="ev-art" style="background-image:url(${th.art})"></div>` : ''}
+          ${banner && data.wedding.art !== false ? `<div class="ev-art" style="background-image:url(${th.art})"></div>` : ''}
           <div class="t">${esc(t.hm)}<small>${t.ap}${e.end ? `<br>to ${esc(fmtTime(e.end, tz))}` : '<br>onwards'}</small></div>
           <div>
             ${nx?.id === e.id ? '<div class="tag">Up next</div>' : ''}
@@ -163,7 +164,7 @@ function schedule() {
             ${v && !past ? `<a class="btn btn-sm btn-primary" style="margin-top:10px;background:var(--accent)" href="#/nav/${esc(v.id)}">Navigate</a>` : ''}
           </div></article>`;
       }).join('')}</div></section>`).join('')}
-    <img class="leaves" src="art/leaves.jpg" alt="" aria-hidden="true">
+    ${data.wedding.art !== false ? '<img class="leaves" src="art/leaves.jpg" alt="" aria-hidden="true">' : ''}
   </div>`;
 }
 

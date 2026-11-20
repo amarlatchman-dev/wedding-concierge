@@ -98,6 +98,6 @@ const state = {
 };
 
 const pub = await buildPublic(state, password);
-writeFileSync(new URL('../data/wedding.json', import.meta.url), JSON.stringify(pub));
+writeFileSync(new URL('../rohan-gazal/data/wedding.json', import.meta.url), JSON.stringify(pub));
 if (linksOut) writeFileSync(linksOut, guests.map((g) => `${g.family} (${g.cottage}): #/g/${g.token}`).join('\n') + '\n');
 console.log(`wrote data/wedding.json: ${markers.length} markers, ${graph.edges.length} paths, ${events.length} events, ${guests.length} guests`);

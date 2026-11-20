@@ -36,10 +36,10 @@ const linkFor = (g) => `${S.secrets.publicUrl}#/g/${g.token}`;
 const tz = () => S.wedding.timezone || 'Asia/Kolkata';
 const loadScript = (src) => new Promise((res, rej) => { if ([...document.scripts].some((s) => s.src === src)) return res(); const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Could not load ' + src)); document.head.appendChild(s); });
 const LIB = {
-  qr: new URL('vendor/qrcode.js', location.href).href,
-  xlsx: new URL('vendor/xlsx.full.min.js', location.href).href,
-  pdf: new URL('vendor/pdf.min.js', location.href).href,
-  pdfWorker: new URL('vendor/pdf.worker.min.js', location.href).href,
+  qr: new URL('../vendor/qrcode.js', import.meta.url).href,
+  xlsx: new URL('../vendor/xlsx.full.min.js', import.meta.url).href,
+  pdf: new URL('../vendor/pdf.min.js', import.meta.url).href,
+  pdfWorker: new URL('../vendor/pdf.worker.min.js', import.meta.url).href,
 };
 async function qrSvg(text, cell = 6) { await loadScript(LIB.qr); const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: cell, margin: 2, scalable: true }); }
 function modal(html, onMount) {
@@ -68,7 +68,10 @@ function render() {
 }
 
 // ---------- Publish ----------
+// Each wedding lives in its own folder of the repo, named like the page's folder.
+const FOLDER = location.pathname.split('/').slice(-2, -1)[0];
 async function ghPut(path, contentB64, message) {
+  path = `${FOLDER}/${path}`;
   const { repo, branch = 'main', token } = S.secrets.github;
   const api = `https://api.github.com/repos/${repo}/contents/${path}`;
   const h = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' };

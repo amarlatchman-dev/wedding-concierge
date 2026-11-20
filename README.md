@@ -3,6 +3,16 @@
 A mobile web app for guests at Neejanand Luxurious Resort (Dec 4–5, 2026), plus an admin dashboard.
 It's a static site with no build step and no server, so it can be hosted anywhere static files are served, such as GitHub Pages.
 
+## Several weddings, one repo
+Each wedding has its own folder (`rohan-gazal/`, …) with its own guest app, admin, password and data. All weddings share the code at the root (`js/`, `app.css`, `vendor/`).
+The root `index.html` and `admin.html` redirect to `rohan-gazal/`, so links sent before the move keep working.
+
+**New wedding:** `node tools/new-wedding.mjs <folder> "<Couple>" <first-day> <last-day> "<Venue>" <admin-password> ["<address>"]`, then commit and push.
+The site is live at `https://amarlatchman-dev.github.io/wedding-concierge/<folder>/`. The organizer uploads the venue map and edits the events in `<folder>/admin.html`.
+A new wedding starts without invitation artwork (`wedding.art: false`) and with the original-image map. An illustrated map, like Rohan & Gazal's (`tools/areas.mjs`), has to be traced by hand for each venue.
+Note: a GitHub publishing token can write to every folder in the repo.
+
+Inside each wedding folder:
 - `index.html`: guest app. Personal links look like `index.html#/g/<token>`.
 - `admin.html`: admin dashboard (password protected).
 - `data/wedding.json`: all published data. Guest details are encrypted per guest (AES-GCM, with the key derived from that guest's link token).
