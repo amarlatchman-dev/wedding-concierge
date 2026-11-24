@@ -70,14 +70,18 @@ function render() {
 // ---------- Publish ----------
 // Each wedding lives in its own folder of the repo, named like the page's folder.
 const FOLDER = location.pathname.split('/').slice(-2, -1)[0];
+const shaCache = {};
 async function ghPut(path, contentB64, message) {
   path = `${FOLDER}/${path}`;
   const { repo, branch = 'main', token } = S.secrets.github;
   const api = `https://api.github.com/repos/${repo}/contents/${path}`;
   const h = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' };
-  const cur = await fetch(`${api}?ref=${branch}`, { headers: h });
-  const sha = cur.ok ? (await cur.json()).sha : undefined;
-  const r = await fetch(api, { method: 'PUT', headers: h, body: JSON.stringify({ message, content: contentB64, branch, sha }) });
+  // Always ask GitHub for the file's current version (never a cached answer), and retry once if it changed meanwhile.
+  const latestSha = async () => { const cur = await fetch(`${api}?ref=${branch}&t=${Date.now()}`, { headers: h, cache: 'no-store' }); return cur.ok ? (await cur.json()).sha : undefined; };
+  const put = async (sha) => fetch(api, { method: 'PUT', headers: h, body: JSON.stringify({ message, content: contentB64, branch, sha }) });
+  let r = await put(shaCache[path] || await latestSha());
+  if (r.status === 409 || r.status === 422) r = await put(await latestSha());
+  if (r.ok) shaCache[path] = (await r.clone().json()).content?.sha;
   if (!r.ok) throw new Error(`GitHub said ${r.status}: ${(await r.json().catch(() => ({}))).message || ''}`);
 }
 // Publishing needs a GitHub token once; ask for it right here instead of silently downloading a file.
