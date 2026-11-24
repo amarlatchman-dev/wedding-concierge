@@ -109,6 +109,7 @@ function home() {
     <section class="row" style="gap:10px">
       <a class="btn btn-ghost" style="flex:1" href="#/schedule">Full schedule</a>
       <a class="btn btn-ghost" style="flex:1" href="#/map">Resort map</a>
+      <a class="btn btn-ghost" style="flex:1" href="#/nav/">Directions</a>
     </section>
     <section class="card">
       <div class="eyebrow" style="margin-bottom:6px">At your service</div>
@@ -171,7 +172,7 @@ function schedule() {
 function mountMap() {
   view.innerHTML = `<div class="mapscreen"><div id="mapHost" style="position:absolute;inset:0"></div>
     <div class="map-top" id="mapTop"></div>
-    <div class="map-ctrl"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zfit" aria-label="Show whole map">⤢</button>${data.map.style === 'illustrated' ? '<button id="zorig" aria-label="Switch between illustrated and original map" title="Original resort map" style="font-size:15px">◐</button>' : ''}</div>
+    <div class="map-ctrl"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zfit" aria-label="Show whole map">⤢</button><a href="#/nav/" aria-label="Get directions" title="Directions" style="width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--rose);color:var(--rose-ink);box-shadow:var(--shadow);text-decoration:none;font-size:20px">➜</a>${data.map.style === 'illustrated' ? '<button id="zorig" aria-label="Switch between illustrated and original map" title="Original resort map" style="font-size:15px">◐</button>' : ''}</div>
     <div id="sheet"></div></div>`;
   mapView = new MapView($('#mapHost'), { src: data.map.src, width: data.map.width, height: data.map.height });
   let original = false;
@@ -213,7 +214,9 @@ function mapScreen(focusId) {
 }
 
 function nav(destId) {
-  const dest = markerById(data, destId);
+  // Without a destination, default to the next event's venue.
+  const nx = nextEvent(data);
+  let dest = markerById(data, destId) || (nx && venueOf(nx)) || data.markers.find((m) => m.category === 'venue');
   if (!dest) { location.hash = '#/map'; return; }
   const mv = mountMap();
   const cottage = guest ? cottageMarker(data, guest.cottage) : null;
@@ -221,6 +224,10 @@ function nav(destId) {
   let from = cottage ? { ...cottage, label: 'Your cottage', name: guest ? `your cottage (${guest.cottage})` : cottage.name } : markerById(data, 'gate');
   let fromMode = 'cottage', mode = 'walk', watchId = null, gpsNote = '';
   const places = data.markers.filter((m) => m.category !== 'cottage').sort((a, b) => a.name.localeCompare(b.name));
+  const cottages = data.markers.filter((m) => m.category === 'cottage').sort((a, b) => parseInt(a.code) - parseInt(b.code) || a.name.localeCompare(b.name));
+  // Grouped list of every place, venues first, then all cottages.
+  const options = (selId, extra = '') => `${extra}<optgroup label="Venues & places">${places.map((p) => `<option value="${p.id}" ${selId === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</optgroup>`
+    + `<optgroup label="Cottages">${cottages.map((p) => `<option value="${p.id}" ${selId === p.id ? 'selected' : ''}>${esc(p.name)}${p.id === cottage?.id ? ' (yours)' : ''}</option>`).join('')}</optgroup>`;
   const render = () => {
     const r = findRoute(data, from, dest, mode);
     mv.drawMarkers([dest, ...(from.id ? [from] : []), ...data.markers.filter((m) => m.category === 'venue' && m.id !== dest.id)], { highlight: [dest.id, from.id], dim: true });
@@ -237,20 +244,34 @@ function nav(destId) {
     const steps = r ? routeSteps(data, r, from.name, dest.name) : [];
     $('#sheet').innerHTML = `<div class="sheet" style="max-height:45%">
       <div class="row between"><div><div class="eyebrow">Directions to</div><h3 style="font-size:26px">${esc(dest.name)}</h3></div><a href="#/map" class="btn btn-sm btn-ghost">Close</a></div>
+      <div class="row" style="gap:8px;margin-top:10px;align-items:flex-end">
+        <div style="flex:1;display:grid;gap:8px">
+          <label class="muted" style="font-size:13px">From
+            <select id="fromSel">${options(fromMode === 'gps' ? '' : (from.label === 'Your cottage' ? '__cottage' : from.id), (cottage ? `<option value="__cottage" ${from.label === 'Your cottage' ? 'selected' : ''}>Your cottage (${esc(guest.cottage)})</option>` : '') + (fromMode === 'gps' ? '<option value="__gps" selected>My location</option>' : ''))}</select></label>
+          <label class="muted" style="font-size:13px">To
+            <select id="toSel">${options(dest.id)}</select></label>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="swap" aria-label="Swap start and destination" title="Swap" style="height:42px;margin-bottom:1px">⇅</button>
+      </div>
       ${r ? `<div class="route-sum" style="margin-top:8px"><b>${r.minutes} min</b><span class="muted">${Math.round(r.meters)} m · ${mode === 'walk' ? 'walking' : 'by buggy/car'}</span></div>`
         : `<p class="note">No ${mode === 'walk' ? 'walking' : 'vehicle'} route is mapped between these places yet. Please ask at Reception.</p>`}
       <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:8px">
         <div class="seg" id="modeSeg"><button data-m="walk" class="${mode === 'walk' ? 'on' : ''}">Walk</button><button data-m="vehicle" class="${mode === 'vehicle' ? 'on' : ''}">Vehicle</button></div>
         ${gpsOK ? `<div class="seg" id="fromSeg"><button data-f="cottage" class="${fromMode === 'cottage' ? 'on' : ''}">From ${cottage ? 'cottage' : 'gate'}</button><button data-f="gps" class="${fromMode === 'gps' ? 'on' : ''}">From my location</button></div>` : ''}
       </div>
-      <label class="muted" style="font-size:13px;display:block;margin-top:12px">Starting point
-        <select id="fromSel">${cottage ? `<option value="__cottage">Your cottage (${esc(guest.cottage)})</option>` : ''}${places.map((p) => `<option value="${p.id}" ${from.id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}${fromMode === 'gps' ? '<option value="__gps" selected>My location</option>' : ''}</select></label>
       ${gpsNote ? `<p class="note" style="margin-top:10px">${esc(gpsNote)}</p>` : ''}
       ${steps.length ? `<ol class="steps">${steps.map((s) => `<li>${esc(s.text)}</li>`).join('')}</ol>` : ''}
       <p class="note" style="margin-top:12px">${fromMode === 'gps' ? 'Your blue dot comes from your phone\'s GPS and may be off by a few metres.' : 'This route follows the resort\'s mapped paths. It is not live GPS tracking.'}</p>
       ${dest.lat && dest.lng ? `<a class="btn btn-ghost btn-block" style="margin-top:10px" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}&travelmode=walking">Open in Google Maps</a>` : ''}
     </div>`;
     $('#modeSeg').onclick = (e) => { const b = e.target.closest('button'); if (b) { mode = b.dataset.m; render(); } };
+    $('#toSel').onchange = (e) => { dest = markerById(data, e.target.value); history.replaceState(null, '', '#/nav/' + dest.id); render(); };
+    $('#swap').onclick = () => {
+      if (fromMode === 'gps' || !from.id) return;
+      const oldFrom = markerById(data, from.id); stopGps(); fromMode = 'cottage';
+      from = dest.id === cottage?.id ? { ...cottage, label: 'Your cottage', name: `your cottage (${guest.cottage})` } : dest;
+      dest = oldFrom; history.replaceState(null, '', '#/nav/' + dest.id); render();
+    };
     $('#fromSel').onchange = (e) => { const v = e.target.value; stopGps(); fromMode = 'cottage'; from = v === '__cottage' ? { ...cottage, label: 'Your cottage', name: `your cottage (${guest.cottage})` } : markerById(data, v); render(); };
     $('#fromSeg') && ($('#fromSeg').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.f === 'gps') startGps(); else { stopGps(); fromMode = 'cottage'; from = cottage || markerById(data, 'gate'); render(); } });
   };
