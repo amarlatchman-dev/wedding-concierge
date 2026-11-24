@@ -227,7 +227,7 @@ export class MapView {
       for (const r of am.radii) el('path', { d: arc(am.cx, am.cy, r, am.from, am.to), class: 'amphi-row' }, g);
     }
     // Cottage blocks: a diamond garden with four cottages at its points.
-    for (const m of markers.filter((x) => x.category === 'cottage' && /^\d+$/.test(x.code || ''))) {
+    for (const m of markers.filter((x) => x.category === 'cottage' && /^\d{1,2}$/.test(x.code || ''))) {
       const g = el('g', { class: 'cot' }, L); if (interactive) g.setAttribute('data-marker', m.id), g.setAttribute('data-area', m.id);
       el('polygon', { points: `${m.x},${m.y - 30} ${m.x + 39},${m.y} ${m.x},${m.y + 30} ${m.x - 39},${m.y}`, class: 'cot-lawn' }, g);
       for (const [dx, dy] of [[0, -30], [39, 0], [0, 30], [-39, 0]]) el('rect', { x: m.x + dx - 7, y: m.y + dy - 7, width: 14, height: 14, rx: 2.5, transform: `rotate(45 ${m.x + dx} ${m.y + dy})`, class: 'cot-unit' }, g);

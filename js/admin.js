@@ -80,6 +80,29 @@ async function ghPut(path, contentB64, message) {
   const r = await fetch(api, { method: 'PUT', headers: h, body: JSON.stringify({ message, content: contentB64, branch, sha }) });
   if (!r.ok) throw new Error(`GitHub said ${r.status}: ${(await r.json().catch(() => ({}))).message || ''}`);
 }
+// Publishing needs a GitHub token once; ask for it right here instead of silently downloading a file.
+function askToken() {
+  return new Promise((done) => {
+    const m = modal(`<h3>Connect publishing (one time)</h3>
+      <p>To make changes live, paste a GitHub token. It is stored encrypted with your admin password.</p>
+      <ol style="font-size:14px;padding-left:18px"><li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → new fine-grained token</a> (signed in as the site owner).</li>
+      <li>Repository access: <b>Only select repositories</b> → <b>wedding-concierge</b>.</li><li>Permissions → Repository → <b>Contents: Read and write</b>. Generate, then copy it.</li></ol>
+      <label class="f">Token<input id="tkn" type="password" placeholder="github_pat_…" autocomplete="off"></label>
+      <p id="tknErr" class="changed"></p>
+      <div class="row between"><button class="btn btn-ghost btn-sm" id="tdl">Download file instead</button><div class="row"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="tok">Connect & publish</button></div></div>`);
+    m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-close]')) done(false); });
+    $('#tdl', m).onclick = async () => { m.remove(); done(false); const pub = await buildPublic(S, password); download('wedding.json', new Blob([JSON.stringify(pub)], { type: 'application/json' })); };
+    $('#tok', m).onclick = async () => {
+      const token = $('#tkn', m).value.trim(); if (!token) return;
+      $('#tok', m).textContent = 'Checking…';
+      const r = await fetch('https://api.github.com/repos/amarlatchman-dev/wedding-concierge', { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+      const j = r?.ok ? await r.json() : null;
+      if (!j?.permissions?.push) { $('#tknErr', m).textContent = 'That token can\'t write to the wedding-concierge repo. Check the repository and Contents permission.'; $('#tok', m).textContent = 'Connect & publish'; return; }
+      S.secrets.github = { repo: 'amarlatchman-dev/wedding-concierge', branch: 'main', token };
+      m.remove(); done(true);
+    };
+  });
+}
 async function publish() {
   const btn = $('#publish'); btn.disabled = true; btn.textContent = 'Publishing…';
   try {
@@ -91,11 +114,9 @@ async function publish() {
       if (mapFile) await ghPut(`data/${mapFile.name}`, b64.to(await mapFile.blob.arrayBuffer()), 'Update property map');
       await ghPut('data/wedding.json', b64.to(new TextEncoder().encode(json)), 'Update wedding details');
       toast('Published. Guests will see the changes within about 2 minutes.');
-    } else {
-      if (mapFile) download(mapFile.name, mapFile.blob);
-      download('wedding.json', new Blob([json], { type: 'application/json' }));
-      toast('Downloaded wedding.json. Upload it to the site\'s data folder, or set up publishing under Settings.');
-    }
+    } else if (!(await askToken())) {
+      btn.disabled = false; btn.textContent = 'Publish'; return;
+    } else return publish();
     published = pub; mapFile = null; dirty = false; render();
   } catch (e) { toast('Publish failed: ' + e.message); btn.disabled = false; btn.textContent = 'Publish'; }
 }
@@ -202,7 +223,7 @@ async function importGuests(file) {
   const pick = (r, ...keys) => { for (const k of Object.keys(r)) if (keys.includes(k.toLowerCase().trim())) return String(r[k]).trim(); return ''; };
   let added = 0, updated = 0;
   for (const r of rows) {
-    const g = { name: pick(r, 'name', 'guest', 'guest name', 'main guest'), family: pick(r, 'family', 'family name'), cottage: pick(r, 'cottage', 'cottage number', 'room').toUpperCase().replace(/\s/g, ''), group: pick(r, 'group', 'side'), phone: pick(r, 'phone', 'whatsapp', 'mobile'), party: pick(r, 'party', 'people', 'count') || 1 };
+    const g = { name: pick(r, 'name', 'guest', 'guest name', 'main guest', 'family/guest', 'family / guest'), family: pick(r, 'family', 'family name'), cottage: pick(r, 'cottage', 'cottage number', 'room').toUpperCase().replace(/\s/g, ''), group: pick(r, 'group', 'side'), phone: pick(r, 'phone', 'whatsapp', 'mobile'), party: pick(r, 'party', 'people', 'count') || 1 };
     if (!g.name && !g.family) continue;
     const ex = S.guests.find((x) => (x.name || '').toLowerCase() === g.name.toLowerCase() && (x.family || '').toLowerCase() === g.family.toLowerCase());
     if (ex) { Object.assign(ex, g); updated++; } else { S.guests.push({ id: uid(), token: randomToken(12), ...g }); added++; }

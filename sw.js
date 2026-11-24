@@ -1,5 +1,5 @@
 // Network-first for data, cache-first for the app shell, so the app still opens with weak resort Wi-Fi.
-const C = 'wc-v6';
+const C = 'wc-v7';
 const SHELL = ['app.css', 'js/core.js', 'js/map.js', 'js/guest.js', 'icon.svg'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(C).then((c) => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== C).map((k) => caches.delete(k))))); self.clients.claim(); });
